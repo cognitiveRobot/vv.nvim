@@ -4,6 +4,7 @@ M.config = {
   cache_dir = "~/.cache/nvim/bear",
   file_name = "tmp_" .. os.date("%m%d_%H%M%S") .. ".csv",
   remove_file = true,
+  timeout = 30,
   window = {
     width = 0.9,
     height = 0.8,

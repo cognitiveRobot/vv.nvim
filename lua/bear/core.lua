@@ -1,6 +1,6 @@
 local M = {}
 
-local dap = require("dap")
+local iron = require("iron.core")
 
 local Mode = {
   FLOAT = "float",
@@ -27,19 +27,18 @@ local function save_dataframe_py_expr(df_var, path)
 
           if var_name not in locals() and var_name not in globals():
               print(f"ERROR: Variable '{var_name}' not found")
-              exit()
+          else:
+              df_var = eval(var_name)
 
-          df_var = eval(var_name)
+              if pandas_installed and isinstance(df_var, pd.DataFrame):
+                  df_var.to_csv(file_path, index=True)
+              elif polars_installed and isinstance(df_var, pl.DataFrame):
+                  df_var.write_csv(file_path)
+              elif polars_installed and isinstance(df_var, pl.LazyFrame):
+                  df_var.collect().write_csv(file_path)
 
-          if pandas_installed and isinstance(df_var, pd.DataFrame):
-              df_var.to_csv(file_path, index=True)
-          elif polars_installed and isinstance(df_var, pl.DataFrame):
-              df_var.write_csv(file_path)
-          elif polars_installed and isinstance(df_var, pl.LazyFrame):
-              df_var.collect().write_csv(file_path)
-
-          if Path(file_path).exists():
-              print(f"SUCCESS: DataFrame saved to {file_path}")
+              if Path(file_path).exists():
+                  print(f"SUCCESS: DataFrame saved to {file_path}")
       except Exception as e:
           print("ERROR: " + str(e))
   ]], df_var, path)
@@ -61,21 +60,21 @@ local function show_floating_window(opts, path)
   })
   vim.api.nvim_buf_set_keymap(buf, 't', opts.keymap.exit_terminal_mode, '<C-\\><C-n>', { noremap = true })
 
-  vim.keymap.set("n", "q", function()
-    if opts.remove_file then
-      vim.fn.system("rm -f " .. path)
-    end
-    vim.cmd("q")
-  end, { noremap = true, silent = true, buffer = buf })
-
-  vim.fn.termopen("visidata " .. path, {
+  local job = vim.fn.termopen("visidata " .. path, {
     on_exit = function()
       if opts.remove_file then
         vim.fn.system("rm -f " .. path)
       end
-      vim.api.nvim_buf_delete(buf, { unload = true })
+      if vim.api.nvim_buf_is_valid(buf) then
+        vim.api.nvim_buf_delete(buf, { unload = true })
+      end
     end
   })
+
+  vim.keymap.set("n", "q", function()
+    vim.fn.jobstop(job)
+  end, { noremap = true, silent = true, buffer = buf })
+
   vim.cmd("startinsert")
 end
 
@@ -87,32 +86,68 @@ local function show_in_new_buffer(opts, path)
   vim.api.nvim_set_current_buf(buf)
   vim.api.nvim_buf_set_keymap(buf, 't', opts.keymap.exit_terminal_mode, '<C-\\><C-n>', { noremap = true })
 
-  vim.keymap.set("n", "q", function()
-    vim.fn.system("rm -f " .. path)
-    vim.cmd("bp | bd! #")
-  end, { noremap = true, silent = true, buffer = buf })
-
-
-  vim.fn.termopen("visidata " .. path, {
+  local job = vim.fn.termopen("visidata " .. path, {
     on_exit = function()
-      vim.fn.system("rm -f " .. path)
+      if opts.remove_file then
+        vim.fn.system("rm -f " .. path)
+      end
       vim.api.nvim_set_current_buf(current_buf)
-      if vim.api.nvim_get_mode().mode == "t" then
+      if vim.api.nvim_buf_is_valid(buf) then
         vim.api.nvim_buf_delete(buf, { unload = true })
       end
     end
   })
+
+  vim.keymap.set("n", "q", function()
+    vim.fn.jobstop(job)
+  end, { noremap = true, silent = true, buffer = buf })
+
   vim.cmd("startinsert")
+end
+
+local function poll_for_dataframe(opts, df_path, mode)
+  local timeout = opts.timeout or 30
+  local interval = opts.poll_interval or 200
+  local elapsed = 0
+
+  local function check()
+    if vim.fn.filereadable(df_path) == 1 then
+      if mode == Mode.BUFFER then
+        show_in_new_buffer(opts, df_path)
+      elseif mode == Mode.FLOAT then
+        show_floating_window(opts, df_path)
+      end
+      return
+    end
+
+    elapsed = elapsed + interval
+    if elapsed >= timeout * 1000 then
+      vim.notify(
+        "Failed to export DataFrame. Is the variable defined in the iron REPL?",
+        vim.log.levels.ERROR
+      )
+      return
+    end
+
+    vim.defer_fn(check, interval)
+  end
+
+  vim.defer_fn(check, interval)
 end
 
 function M.visualise_dataframe(opts, mode)
   opts = opts or {}
-  vim.fn.system("mkdir -p " .. opts.cache_dir)
-  local session = dap.session()
-  if not session then
-    vim.notify("No active debug session", vim.log.levels.ERROR)
+  mode = mode or Mode.FLOAT
+
+  if vim.fn.executable("visidata") ~= 1 then
+    vim.notify(
+      "visidata not found in PATH. Install it: https://www.visidata.org/install/",
+      vim.log.levels.ERROR
+    )
     return
   end
+
+  vim.fn.system("mkdir -p " .. opts.cache_dir)
 
   local df_var = vim.fn.expand("<cword>")
   if df_var == "" then
@@ -127,22 +162,9 @@ function M.visualise_dataframe(opts, mode)
 
   local expr = save_dataframe_py_expr(df_var, df_path)
 
-  session:evaluate(expr, function(err, _)
-    if err then
-      vim.notify("Evaluation error: " .. vim.inspect(err), vim.log.levels.ERROR)
-      return
-    end
-    if vim.fn.filereadable(df_path) == 1 then
-      if mode == Mode.BUFFER then
-        show_in_new_buffer(opts, df_path)
-      end
-      if mode == Mode.FLOAT then
-        show_floating_window(opts, df_path)
-      end
-    else
-      vim.notify("Failed to export DataFrame.", vim.log.levelsgERROR)
-    end
-  end)
+  iron.send(vim.bo.filetype, expr)
+
+  poll_for_dataframe(opts, df_path, mode)
 end
 
 return M
