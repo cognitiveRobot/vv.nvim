@@ -41,6 +41,7 @@ https://github.com/user-attachments/assets/55e22539-9938-4b48-9ec5-b1b6a43b976b
       file_name = "tmp_" .. os.date("%m%d_%H%M%S") .. ".csv",
       remove_file = true, -- remove file upon quitting visidata
       timeout = 30, -- seconds to wait for the export to complete
+      stats = true, -- show per-column stats under the column names
       window = {
         width = 0.9,
         height = 0.8,
@@ -83,6 +84,7 @@ You can see my debugging setup [here](https://github.com/nelnn/dotfiles/blob/mai
 | ------------- | -------------- |
 | DFView | View dataframe in a floating window|
 | DFViewBuf | View dataframe in a new buffer|
+| DFViewStats | View dataframe with column stats in a floating window (forces stats on)|
 | DFClean | Clear cache directory|
 
 
