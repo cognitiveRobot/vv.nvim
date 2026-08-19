@@ -101,12 +101,12 @@ try:
 
             with open(file_path, "w", newline="") as fh:
                 w = csv.writer(fh)
-                w.writerow(["bear_index"] + headers)
+                w.writerow(["vv_index"] + headers)
             if is_pandas:
                 df_var.to_csv(file_path, mode="a", header=False, index=True)
             else:
                 with open(file_path, "a") as fh:
-                    df_var.with_row_index(name="bear_index").write_csv(fh, include_header=False)
+                    df_var.with_row_index(name="vv_index").write_csv(fh, include_header=False)
             if Path(file_path).exists():
                 print(f"SUCCESS: DataFrame saved to {file_path}")
         else:
