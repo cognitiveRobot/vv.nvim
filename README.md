@@ -1,4 +1,4 @@
-# 🐼`bear.nvim`🐻‍❄️
+# 🐼`vv.nvim`🐻‍❄️
 
 A neovim plugin for debugging `pandas` and `polars` DataFrames.
 
@@ -19,7 +19,7 @@ https://github.com/user-attachments/assets/55e22539-9938-4b48-9ec5-b1b6a43b976b
 
 ```lua
 {
-  "nelnn/bear.nvim",
+  "nelnn/vv.nvim",
   dependencies = {
     "Vigemus/iron.nvim",
   },
@@ -32,12 +32,12 @@ https://github.com/user-attachments/assets/55e22539-9938-4b48-9ec5-b1b6a43b976b
 
 ```lua
 {
-  "nelnn/bear.nvim",
+  "nelnn/vv.nvim",
   dependencies = {
     "Vigemus/iron.nvim",
   },
   opts = {
-      cache_dir = "~/.cache/nvim/bear",
+      cache_dir = "~/.cache/nvim/vv",
       file_name = "tmp_" .. os.date("%m%d_%H%M%S") .. ".csv",
       remove_file = true, -- remove file upon quitting visidata
       timeout = 30, -- seconds to wait for the export to complete
@@ -48,14 +48,14 @@ https://github.com/user-attachments/assets/55e22539-9938-4b48-9ec5-b1b6a43b976b
         border = "rounded"
       },
       keymap = {
-        visualise = "<leader>df",
-        visualise_buf = "<leader>bdf",
+        visualise = "<leader>vv",
+        visualise_buf = "<leader>vb",
         exit_terminal_mode = "<C-o>",
       }
   },
 
   config = function(_, opts)
-    local df_visidata = require("bear")
+    local df_visidata = require("vv")
     df_visidata.setup(opts)
   end,
 
